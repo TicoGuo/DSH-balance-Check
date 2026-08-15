@@ -39,6 +39,11 @@
   background: var(--dsh-surface, #1e1e1e);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
   z-index: 40;
+  /* The app has no global border-box reset, so the max-height we set on the
+     popover must include this element's own padding + border. Without this the
+     rendered panel is 26px taller than max-height and its top edge (the first
+     line of text) gets clipped above the viewport. */
+  box-sizing: border-box;
   overflow-y: auto;
   overscroll-behavior: contain;
 }

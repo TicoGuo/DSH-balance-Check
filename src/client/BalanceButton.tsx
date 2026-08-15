@@ -123,8 +123,12 @@ export function BalanceButton({ queryBalance, openRecharge }: BalanceButtonProps
       setOpen(false)
       return
     }
-    // Cap the popover to the space above the button so it never runs off the
-    // top of the viewport when the composer sits mid-screen.
+    // Cap the popover to the space above the button so its top edge (the
+    // panel's own background, not the text inside) never runs off the top of
+    // the viewport when the composer sits mid-screen. The popover sits 8px
+    // above the button (bottom: calc(100% + 8px)); with box-sizing:
+    // border-box on .popover, max-height == outer height, so rect.top - 8 is
+    // the exact available space and the extra -4 keeps a visible 4px gap.
     const rect = rootRef.current?.getBoundingClientRect()
     setPopoverMaxHeight(rect !== undefined ? Math.max(160, rect.top - 12) : undefined)
     setOpen(true)
