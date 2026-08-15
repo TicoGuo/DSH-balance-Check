@@ -1,0 +1,10 @@
+# The dsh-balance-check bundle patch: the DeepSeek balance + usage plugin as
+# ONE insert over the profile tree. Applied after dsh-base and dsh-web-app;
+# later patches and the user's profile cordis.patch.yml address these rows by id.
+
+- insert:
+    # DeepSeek account balance + usage check: a /balance route for the composer
+    # button, plus the "余额显示" plugin-configuration card. Dual-face package:
+    # the node half is the host route, the browser half is the UI.
+    - id: balance-check
+      name: '@ticoguo/dsh-balance-check'
