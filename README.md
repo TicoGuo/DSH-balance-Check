@@ -1,6 +1,8 @@
-# @ticoguo/dsh-balance-check
+# @TicoGuo/dsh-balance-check
 
 DSH（DeepSeek Harness）余额 + 用量插件。安装后在输入框旁显示 `¥` 余额按钮，点开弹窗可查看余额、消费金额、Tokens 用量、各模型明细，并有充值入口；在「设置 → 插件 → 插件配置」里提供「余额显示」配置卡片。
+
+<img width="302" height="660" alt="image" src="https://github.com/user-attachments/assets/8fc722a3-0bda-45e6-9796-050e2216c66f" />
 
 ## 安装（一条命令）
 
