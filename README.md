@@ -7,7 +7,7 @@ DSH（DeepSeek Harness）余额 + 用量插件。安装后在输入框旁显示 
 ## 安装（一条命令）
 
 ```bash
-dsh plugin --profile web add github:TicoGuo/dsh-balance-check
+dsh plugin --profile web add github:TicoGuo/DSH-balance-Check
 ```
 
 安装后重启 `dsh web`，浏览器打开 http://127.0.0.1:3080 即可。
