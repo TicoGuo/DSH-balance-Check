@@ -81,6 +81,7 @@ export function BalanceButton({ queryBalance, openRecharge }: BalanceButtonProps
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<BalanceResponse | null>(null)
+  const [popoverMaxHeight, setPopoverMaxHeight] = useState<number | undefined>()
   const rootRef = useRef<HTMLDivElement | null>(null)
 
   // Dismiss on outside pointer and Escape while open.
@@ -122,6 +123,10 @@ export function BalanceButton({ queryBalance, openRecharge }: BalanceButtonProps
       setOpen(false)
       return
     }
+    // Cap the popover to the space above the button so it never runs off the
+    // top of the viewport when the composer sits mid-screen.
+    const rect = rootRef.current?.getBoundingClientRect()
+    setPopoverMaxHeight(rect !== undefined ? Math.max(160, rect.top - 12) : undefined)
     setOpen(true)
     // Refresh on every open so the popover always shows the latest data.
     void load()
@@ -161,7 +166,12 @@ export function BalanceButton({ queryBalance, openRecharge }: BalanceButtonProps
         </span>
       </button>
       {open && (
-        <div className={css.popover} role="dialog" aria-label="账户余额与用量">
+        <div
+          className={css.popover}
+          role="dialog"
+          aria-label="账户余额与用量"
+          style={{ maxHeight: popoverMaxHeight }}
+        >
           {result === null && <div className={css.state}>查询中…</div>}
           {result !== null && result.ok === false && (
             <div className={css.error}>{result.error}</div>
