@@ -57,6 +57,24 @@ npx @deepseek-ai/dsh plugin --profile web add github:TicoGuo/DSH-balance-Check
 
 保存后，输入框右侧即出现 `¥` 余额按钮。
 
+## 卸载
+
+一条命令即可卸载：
+
+```bash
+dsh plugin --profile web remove @ticoguo/dsh-balance-check
+```
+
+未全局安装 `dsh` 时，改用 `npx` 前缀：
+
+```bash
+npx @deepseek-ai/dsh plugin --profile web remove @ticoguo/dsh-balance-check
+```
+
+卸载后重启 `dsh web` 生效。
+
+> 若提示 `ERR_PNPM_CANNOT_REMOVE_MISSING_DEPS`，说明依赖已不在 `dependencies` 中、只剩 bundle 条目残留：手动打开 profile 的 `package.json`，从 `dsh.profile.bundles` 中删掉 `@ticoguo/dsh-balance-check` 即可（profile 位于 `$DSH_HOME/profiles/web`，`$DSH_HOME` 默认是 `~/.dsh`）。
+
 ## 依赖说明
 
 - 运行时依赖 DSH 核心包（`@deepseek-ai/cordis`、`@deepseek-ai/dsh-*`、`@deepseek-ai/schemastery`、`react`），它们由使用者的 DSH 安装提供，无需单独安装。
