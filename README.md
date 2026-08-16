@@ -4,10 +4,26 @@ DSH（DeepSeek Harness）余额 + 用量插件。安装后在输入框旁显示 
 
 <img width="302" height="660" alt="image" src="https://github.com/user-attachments/assets/8fc722a3-0bda-45e6-9796-050e2216c66f" />
 
+## 前置条件
+
+安装者机器上需要先准备好 DSH 的命令行工具，否则会报 `无法将“dsh”项识别为 cmdlet`：
+
+1. **Node.js**（含 npm）。
+2. **`dsh` 命令行工具**（由 DeepSeek Harness 提供），二选一：
+   - 全局安装：`npm install -g @deepseek-ai/dsh`（之后可直接使用 `dsh` 命令）；
+   - 或每次用 `npx` 前缀临时运行，无需全局安装。
+3. **pnpm**：`dsh plugin ... add` 底层会转发给 pnpm，请先 `npm install -g pnpm`。
+
 ## 安装（一条命令）
 
 ```bash
 dsh plugin --profile web add github:TicoGuo/DSH-balance-Check
+```
+
+未全局安装 `dsh` 时，改用 `npx` 前缀：
+
+```bash
+npx @deepseek-ai/dsh plugin --profile web add github:TicoGuo/DSH-balance-Check
 ```
 
 安装后重启 `dsh web`，浏览器打开 http://127.0.0.1:3080 即可。
