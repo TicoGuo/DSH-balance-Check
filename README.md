@@ -6,15 +6,35 @@ DSH（DeepSeek Harness）余额 + 用量插件。安装后在输入框旁显示 
 
 ## 前置条件
 
-安装者机器上需要先准备好 DSH 的命令行工具，否则会报 `无法将“dsh”项识别为 cmdlet`：
+安装前请先准备好以下环境。若提示 `无法将“dsh”项识别为 cmdlet`，说明 `dsh` 尚未安装或不在 PATH 中，请先完成第 2 步。
 
-1. **Node.js**（含 npm）。
-2. **`dsh` 命令行工具**（由 DeepSeek Harness 提供），二选一：
-   - 全局安装：`npm install -g @deepseek-ai/dsh`（之后可直接使用 `dsh` 命令）；
-   - 或每次用 `npx` 前缀临时运行，无需全局安装。
-3. **pnpm**：`dsh plugin ... add` 底层会转发给 pnpm，请先 `npm install -g pnpm`。
+**1. Node.js**（自带 npm）
 
-## 安装（一条命令）
+**2. `dsh` 命令行工具** —— 二选一：
+
+全局安装（之后可直接使用 `dsh` 命令）：
+
+```bash
+npm install -g @deepseek-ai/dsh
+```
+
+或每次用 `npx` 前缀临时运行，无需全局安装：
+
+```bash
+npx @deepseek-ai/dsh --version
+```
+
+**3. pnpm** —— `dsh plugin ... add` 底层会转发给 pnpm：
+
+```bash
+npm install -g pnpm
+```
+
+完成后可运行 `dsh --version`（或 `npx @deepseek-ai/dsh --version`）确认可用。
+
+## 安装
+
+一条命令即可安装：
 
 ```bash
 dsh plugin --profile web add github:TicoGuo/DSH-balance-Check
