@@ -82,6 +82,7 @@ export function BalanceButton({ queryBalance, openRecharge }: BalanceButtonProps
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<BalanceResponse | null>(null)
   const [popoverMaxHeight, setPopoverMaxHeight] = useState<number | undefined>()
+  const [popoverPlace, setPopoverPlace] = useState<{ bottom: number; right: number } | undefined>()
   const rootRef = useRef<HTMLDivElement | null>(null)
 
   // Dismiss on outside pointer and Escape while open.
@@ -118,37 +119,47 @@ export function BalanceButton({ queryBalance, openRecharge }: BalanceButtonProps
     void load()
   }, [load])
 
-  // Cap the popover to the space above the button so its top edge (the panel's
-  // own background, not the text inside) never runs off the top of the
-  // viewport — and re-fit it whenever the window resizes while it is open. The
-  // popover sits 8px above the button (bottom: calc(100% + 8px)); with
-  // box-sizing: border-box on .popover, max-height == outer height, so
-  // rect.top - 12 is the exact available height, keeping a 4px visible gap.
-  const measurePopoverHeight = useCallback(() => {
+  // The popover is fixed to the viewport (see BalanceButton.module.css) so it
+  // escapes the conversation scroll container's overflow clip. Measure the
+  // button's rect and derive (1) the fixed bottom/right that parks the panel
+  // 8px above the button and flush with its right edge, and (2) the max-height
+  // that keeps the panel's top edge inside the viewport (8px gap + 4px margin).
+  const measurePopover = useCallback(() => {
     const rect = rootRef.current?.getBoundingClientRect()
-    const spaceAbove = rect !== undefined ? rect.top - 12 : undefined
-    setPopoverMaxHeight(spaceAbove !== undefined && spaceAbove > 0 ? spaceAbove : undefined)
+    if (rect === undefined) return
+    const gap = 8
+    const spaceAbove = rect.top - gap - 4
+    setPopoverPlace({
+      bottom: window.innerHeight - rect.top + gap,
+      right: window.innerWidth - rect.right,
+    })
+    setPopoverMaxHeight(spaceAbove > 0 ? spaceAbove : undefined)
   }, [])
 
-  // Re-measure on window resize so the popover follows the button's current
-  // position instead of keeping a stale height from the moment it was opened.
+  // Re-fit whenever the viewport resizes or the conversation scrolls while the
+  // popover is open (scroll is captured so the sticky-composer's own scroller
+  // is caught too), so the panel never lags the button's current position.
   useEffect(() => {
     if (!open) return
-    measurePopoverHeight()
-    window.addEventListener('resize', measurePopoverHeight)
-    return () => { window.removeEventListener('resize', measurePopoverHeight) }
-  }, [open, measurePopoverHeight])
+    measurePopover()
+    window.addEventListener('resize', measurePopover)
+    window.addEventListener('scroll', measurePopover, true)
+    return () => {
+      window.removeEventListener('resize', measurePopover)
+      window.removeEventListener('scroll', measurePopover, true)
+    }
+  }, [open, measurePopover])
 
   const toggle = useCallback(() => {
     if (open) {
       setOpen(false)
       return
     }
-    measurePopoverHeight()
+    measurePopover()
     setOpen(true)
     // Refresh on every open so the popover always shows the latest data.
     void load()
-  }, [open, load, measurePopoverHeight])
+  }, [open, load, measurePopover])
 
   const refresh = useCallback(() => {
     void load()
@@ -188,7 +199,7 @@ export function BalanceButton({ queryBalance, openRecharge }: BalanceButtonProps
           className={css.popover}
           role="dialog"
           aria-label="账户余额与用量"
-          style={{ maxHeight: popoverMaxHeight }}
+          style={{ maxHeight: popoverMaxHeight, bottom: popoverPlace?.bottom, right: popoverPlace?.right }}
         >
           {result === null && <div className={css.state}>查询中…</div>}
           {result !== null && result.ok === false && (

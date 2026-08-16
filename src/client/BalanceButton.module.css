@@ -29,10 +29,13 @@
 }
 
 .popover {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  right: 0;
+  /* Fixed to the viewport so it escapes the conversation scroll container's
+     overflow clip (the composer lives inside a scrollable box whose top edge
+     would otherwise crop the panel). bottom/right are set inline from the
+     button's rect. */
+  position: fixed;
   width: 264px;
+  max-width: calc(100vw - 24px);
   padding: 12px;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 10px;
@@ -41,7 +44,7 @@
   background: var(--dsw-alias-bg-layer-3);
   color: var(--dsw-alias-label-primary);
   box-shadow: var(--dsw-shadow-lv3, 0 8px 24px rgba(0, 0, 0, 0.35));
-  z-index: 40;
+  z-index: 1000;
   /* The app has no global border-box reset, so the max-height we set on the
      popover must include this element's own padding + border. Without this the
      rendered panel is 26px taller than max-height and its top edge (the first
