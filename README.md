@@ -50,12 +50,27 @@ npx @deepseek-ai/dsh plugin --profile web add github:TicoGuo/DSH-balance-Check
 
 ## 配置
 
+插件读取两个凭据：`DEEPSEEK_API_KEY`（必需）和 `DEEPSEEK_USER_TOKEN`（可选，用于消费金额 / Tokens 用量）。任选一种方式配置：
+
+### 方式一：网页卡片（推荐）
+
 进入 **设置 → 插件 → 插件配置 → 余额显示**：
 
 - **DeepSeek API Key**（必需，`sk-` 开头）——已配置会显示脱敏值，输入新值即可替换。
-- **平台登录态 Token**（可选，用于消费金额 / Tokens 用量）——获取方法见卡片内说明。
+- **平台登录态 Token**（可选）——获取方法见卡片内说明。
 
-保存后，输入框右侧即出现 `¥` 余额按钮。
+保存后立即生效，输入框右侧出现 `¥` 余额按钮。
+
+### 方式二：直接写凭据文件（任何 DSH 都可用）
+
+若卡片未出现，可直接编辑 DSH 的凭据文件 `$DSH_HOME/.credentials.yaml`（`$DSH_HOME` 默认 `~/.dsh`，即 `C:\Users\<你>\.dsh\.credentials.yaml`）：
+
+```yaml
+DEEPSEEK_API_KEY: "sk-你的key"
+DEEPSEEK_USER_TOKEN: "你的平台登录态token（可选）"
+```
+
+保存后重启 `dsh web`，输入框右侧的 `¥` 余额按钮即可读取到凭据并显示余额。
 
 ## 卸载
 

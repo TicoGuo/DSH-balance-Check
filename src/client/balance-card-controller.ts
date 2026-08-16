@@ -162,7 +162,13 @@ export class BalanceCardController {
 
   private projection(): BalanceCardState {
     return {
-      available: this.scope.getSnapshot().status === 'ready',
+      // The card is credentials-only: it writes through the credentials domain,
+      // not the balance-check settings namespace. Gating on the settings-scope
+      // status would hide it on stock DSH builds whose apiproxy whitelist does
+      // not expose third-party namespaces (WEB_SETTINGS_NAMESPACES). Render it
+      // whenever the client plugin is composed; a missing credentials service
+      // degrades to per-field "failed" instead of hiding the whole card.
+      available: true,
       dirty: this.staged.size > 0,
       saving: this.saving,
       failed: this.failed,
