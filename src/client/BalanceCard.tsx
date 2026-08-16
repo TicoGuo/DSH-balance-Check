@@ -79,7 +79,7 @@ export function BalanceCard(props: BalanceCardProps) {
   const canSave = state.dirty && !state.saving
 
   return (
-    <li className={open ? css.cardOpen : css.card}>
+    <li className={open ? `${css.card} ${css.cardOpen}` : css.card}>
       <button
         type="button"
         className={css.header}
