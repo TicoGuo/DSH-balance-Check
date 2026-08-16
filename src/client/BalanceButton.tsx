@@ -118,23 +118,37 @@ export function BalanceButton({ queryBalance, openRecharge }: BalanceButtonProps
     void load()
   }, [load])
 
+  // Cap the popover to the space above the button so its top edge (the panel's
+  // own background, not the text inside) never runs off the top of the
+  // viewport — and re-fit it whenever the window resizes while it is open. The
+  // popover sits 8px above the button (bottom: calc(100% + 8px)); with
+  // box-sizing: border-box on .popover, max-height == outer height, so
+  // rect.top - 12 is the exact available height, keeping a 4px visible gap.
+  const measurePopoverHeight = useCallback(() => {
+    const rect = rootRef.current?.getBoundingClientRect()
+    const spaceAbove = rect !== undefined ? rect.top - 12 : undefined
+    setPopoverMaxHeight(spaceAbove !== undefined && spaceAbove > 0 ? spaceAbove : undefined)
+  }, [])
+
+  // Re-measure on window resize so the popover follows the button's current
+  // position instead of keeping a stale height from the moment it was opened.
+  useEffect(() => {
+    if (!open) return
+    measurePopoverHeight()
+    window.addEventListener('resize', measurePopoverHeight)
+    return () => { window.removeEventListener('resize', measurePopoverHeight) }
+  }, [open, measurePopoverHeight])
+
   const toggle = useCallback(() => {
     if (open) {
       setOpen(false)
       return
     }
-    // Cap the popover to the space above the button so its top edge (the
-    // panel's own background, not the text inside) never runs off the top of
-    // the viewport when the composer sits mid-screen. The popover sits 8px
-    // above the button (bottom: calc(100% + 8px)); with box-sizing:
-    // border-box on .popover, max-height == outer height, so rect.top - 8 is
-    // the exact available space and the extra -4 keeps a visible 4px gap.
-    const rect = rootRef.current?.getBoundingClientRect()
-    setPopoverMaxHeight(rect !== undefined ? Math.max(160, rect.top - 12) : undefined)
+    measurePopoverHeight()
     setOpen(true)
     // Refresh on every open so the popover always shows the latest data.
     void load()
-  }, [open, load])
+  }, [open, load, measurePopoverHeight])
 
   const refresh = useCallback(() => {
     void load()
