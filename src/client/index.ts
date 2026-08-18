@@ -68,8 +68,7 @@ export function apply(ctx: ClientContext): void {
 
   ctx.slots.inject('settings.plugin.item', () => ctx.slots.register({
     name: 'settings.plugin.item',
-    id: 'balance-check',
-    order: 30,
+    key: 'balance-check',
     locale: NS,
     inject: () => card.inject(),
   }, BalanceCard))
