@@ -48,6 +48,22 @@ npx @deepseek-ai/dsh plugin --profile web add github:TicoGuo/DSH-balance-Check
 
 安装后重启 `dsh web`，浏览器打开 http://127.0.0.1:3080 即可。
 
+## 更新
+
+有新版时，**重新执行同一条安装命令**即可拉到最新（git 依赖会重新拉取默认分支的最新提交，无需先卸载）：
+
+```bash
+dsh plugin --profile web add github:TicoGuo/DSH-balance-Check
+```
+
+也可以使用 update：
+
+```bash
+dsh plugin --profile web update @ticoguo/dsh-balance-check
+```
+
+更新后重启 `dsh web` 生效。
+
 ## 配置
 
 插件读取两个凭据：`DEEPSEEK_API_KEY`（必需）和 `DEEPSEEK_USER_TOKEN`（可选，用于消费金额 / Tokens 用量）。任选一种方式配置：
