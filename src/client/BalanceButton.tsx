@@ -102,22 +102,29 @@ export function BalanceButton({ queryBalance, openRecharge }: BalanceButtonProps
     }
   }, [open])
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      setResult(await queryBalance())
-    } catch (error) {
-      setResult({ ok: false, error: error instanceof Error ? error.message : String(error) })
-    } finally {
-      setLoading(false)
-    }
-  }, [queryBalance])
+  // Monotonic request sequence: only the most recent load() may write state, so
+  // a stale response (quick refresh clicks, open-triggered loads) can neither
+  // overwrite a newer result nor reset `loading` early.
+  const seqRef = useRef(0)
+  // Whether the first-load failure already auto-opened the popover (once per
+  // mount — a fresh install without an API key must not nag on every load).
+  const autoOpenedRef = useRef(false)
 
-  // Load once on mount so the button can show the balance amount directly,
-  // without requiring a click first.
-  useEffect(() => {
-    void load()
-  }, [load])
+  const load = useCallback(async (): Promise<BalanceResponse | null> => {
+    const seq = ++seqRef.current
+    setLoading(true)
+    let outcome: BalanceResponse | null = null
+    try {
+      outcome = await queryBalance()
+      if (seq === seqRef.current) setResult(outcome)
+    } catch (error) {
+      outcome = { ok: false, error: error instanceof Error ? error.message : String(error) }
+      if (seq === seqRef.current) setResult(outcome)
+    } finally {
+      if (seq === seqRef.current) setLoading(false)
+    }
+    return outcome
+  }, [queryBalance])
 
   // The popover is fixed to the viewport (see BalanceButton.module.css) so it
   // escapes the conversation scroll container's overflow clip. Measure the
@@ -150,6 +157,20 @@ export function BalanceButton({ queryBalance, openRecharge }: BalanceButtonProps
     }
   }, [open, measurePopover])
 
+  // Load once on mount so the button can show the balance amount directly,
+  // without requiring a click first. When that first read fails — typically a
+  // fresh install with no API key yet — auto-open the popover once so the
+  // setup guidance is visible without the user having to discover the button.
+  useEffect(() => {
+    void load().then((outcome) => {
+      if (outcome !== null && !outcome.ok && !autoOpenedRef.current) {
+        autoOpenedRef.current = true
+        measurePopover()
+        setOpen(true)
+      }
+    })
+  }, [load, measurePopover])
+
   const toggle = useCallback(() => {
     if (open) {
       setOpen(false)
@@ -168,30 +189,38 @@ export function BalanceButton({ queryBalance, openRecharge }: BalanceButtonProps
   const balance = result?.ok === true ? result.balance : undefined
   const usage = result?.ok === true ? result.usage : undefined
   const models = result?.ok === true ? result.models : undefined
-  const usageNote = result?.ok === true ? result.usage_note : undefined
-  const usageHint = usageNote ?? (usage === undefined
-    ? '未获取到用量数据：请重启 dsh 服务，并在 .credentials.yaml 配置 DEEPSEEK_USER_TOKEN 后即可显示消费金额与 Tokens 用量。'
-    : undefined)
+  // The host always sends `usage_note` when usage is missing, so there is no
+  // local fallback copy to keep (the old one referenced editing
+  // .credentials.yaml and a restart — both outdated since the card writes live).
+  const usageHint = result?.ok === true ? result.usage_note : undefined
   const isAvailable = result?.ok === true ? result.is_available : false
 
   const balanceCode = balance?.currency
   const usageCode = usage?.currency
   const totalBalance = balance === undefined ? undefined : Number(balance.total_balance)
+  const balanceShown = totalBalance !== undefined && Number.isFinite(totalBalance)
+  // A failed read must look different from "still loading": fresh installs have
+  // no API key, and the plain '…' label hid that state from new users.
+  const isError = result !== null && result.ok === false
 
   return (
     <div ref={rootRef} className={css.root}>
       <button
         type="button"
-        className={css.trigger}
+        className={isError ? `${css.trigger} ${css.triggerError}` : css.trigger}
         onClick={toggle}
-        aria-label="查询余额"
+        aria-label={isError ? '余额查询异常，点击查看详情' : '查询余额'}
         aria-expanded={open}
-        title="查询余额"
+        title={isError ? '余额查询异常，点击查看详情' : '查询余额'}
       >
-        <span className={css.label}>
-          {totalBalance !== undefined && Number.isFinite(totalBalance)
+        <span className={isError ? `${css.label} ${css.labelError}` : css.label}>
+          {balanceShown
             ? `${symbolFor(balanceCode)}${totalBalance.toFixed(2)}`
-            : '…'}
+            : isError
+              ? '¥!'
+              : result === null
+                ? '…'
+                : '¥'}
         </span>
       </button>
       {open && (
@@ -203,7 +232,14 @@ export function BalanceButton({ queryBalance, openRecharge }: BalanceButtonProps
         >
           {result === null && <div className={css.state}>查询中…</div>}
           {result !== null && result.ok === false && (
-            <div className={css.error}>{result.error}</div>
+            <div className={css.error}>
+              {result.error}
+              {/* Only config-related failures (host message starts with 未配置)
+                  get the setup-path hint; network/server errors would mislead. */}
+              {result.error.startsWith('未配置') && (
+                <div className={css.errorHint}>配置入口：设置 → 插件 → 插件配置 → 余额显示</div>
+              )}
+            </div>
           )}
           {result !== null && result.ok === true && (
             balance !== undefined || usage !== undefined || usageHint !== undefined

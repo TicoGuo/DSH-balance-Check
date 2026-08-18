@@ -1,0 +1,17 @@
+# Dependencies / build artifacts
+node_modules/
+*.tsbuildinfo
+*.log
+
+# Local environment & credentials — never commit real secrets
+.env
+.env.*
+.credentials*
+*.local
+
+# Sourcemaps are served locally by DSH but are not published
+*.map
+
+# OS noise
+.DS_Store
+Thumbs.db

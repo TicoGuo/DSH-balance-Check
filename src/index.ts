@@ -18,6 +18,10 @@
  * plugin-configuration surface can render a "余额显示" card whose base-URL field
  * edits this plugin's configuration and whose key fields write the two credential
  * references through the credentials domain.
+ *
+ * The route accepts a `?usage=0` query to serve a lightweight mode used by the
+ * configuration card: masked credentials only, no network calls — opening the
+ * card must not trigger the platform usage aggregation.
  * @module @ticoguo/dsh-balance-check
  */
 import type { Context } from '@deepseek-ai/cordis'
@@ -53,6 +57,9 @@ const PLATFORM_BASE_URL = 'https://platform.deepseek.com'
 
 /** Platform auth failure codes (same envelope codes used by the dashboard). */
 const PLATFORM_AUTH_CODES = new Set([40002, 40003])
+
+/** Timeout for every outbound DeepSeek call; a hung endpoint must not stall the route forever. */
+const REQUEST_TIMEOUT_MS = 10_000
 
 /**
  * Plugin configuration. Every field is optional; `baseURL` is also exposed to
@@ -155,6 +162,13 @@ async function resolveSecret(ctx: Context, envName: string): Promise<string | un
   return launchEnvironmentOf(ctx).get(ref)?.value
 }
 
+/** Resolve the platform session token once: `DEEPSEEK_USER_TOKEN`, then the ecosystem alias. */
+async function resolvePlatformToken(ctx: Context): Promise<string | undefined> {
+  const userToken = await resolveSecret(ctx, USER_TOKEN_ENV)
+  if (userToken !== undefined && userToken.length > 0) return userToken
+  return resolveSecret(ctx, PLATFORM_TOKEN_ENV)
+}
+
 /** Parse a numeric string defensively; a missing/invalid value reads as zero. */
 function toNumber(value: string | undefined): number {
   if (value === undefined) return 0
@@ -174,6 +188,45 @@ function maskSecret(value: string | undefined): string {
   return `${value.slice(0, 5)}****${value.slice(-4)}`
 }
 
+/** One balance fetch outcome: either the parsed view or a failure message. */
+interface BalanceFetchResult {
+  is_available: boolean
+  balance?: BalanceInfo
+  error?: string
+}
+
+/** GET the DeepSeek `/user/balance` endpoint with a timeout. */
+async function fetchBalance(url: string, apiKey: string): Promise<BalanceFetchResult> {
+  let response: Response
+  try {
+    response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Accept: 'application/json',
+      },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    })
+  } catch (error) {
+    return {
+      is_available: false,
+      error: `无法连接 DeepSeek 接口：${error instanceof Error ? error.message : String(error)}`,
+    }
+  }
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '')
+    const detail = body.length > 0 ? `：${body.slice(0, 200)}` : ''
+    return { is_available: false, error: `DeepSeek 接口返回 ${response.status}${detail}` }
+  }
+
+  const data = (await response.json()) as {
+    is_available?: boolean
+    balance_infos?: BalanceInfo[]
+  }
+  return { is_available: data.is_available ?? false, balance: data.balance_infos?.[0] }
+}
+
 /** Query the DeepSeek account balance and project it into a browser-safe view. */
 async function queryBalance(ctx: Context, config: Config): Promise<BalanceResponse> {
   const apiKey = await resolveSecret(ctx, API_KEY_ENV)
@@ -185,47 +238,26 @@ async function queryBalance(ctx: Context, config: Config): Promise<BalanceRespon
   }
 
   const url = `${balanceBaseURL(ctx, config)}/user/balance`
-  let response: Response
-  try {
-    response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        Accept: 'application/json',
-      },
-    })
-  } catch (error) {
-    return {
-      ok: false,
-      error: `无法连接 DeepSeek 接口：${error instanceof Error ? error.message : String(error)}`,
-    }
+  // Resolve the platform token exactly once per request; it feeds both the
+  // usage aggregation and the masked view returned to the browser.
+  const platformToken = await resolvePlatformToken(ctx)
+
+  // Balance and usage are independent — run them concurrently. Detailed usage
+  // stays best-effort: a missing token or a platform failure must never turn a
+  // healthy balance read into an error (queryUsage swallows its own failures).
+  const [balanceResult, usageResult] = await Promise.all([
+    fetchBalance(url, apiKey),
+    queryUsage(ctx, new Date(), platformToken),
+  ])
+
+  if (balanceResult.error !== undefined) {
+    return { ok: false, error: balanceResult.error }
   }
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => '')
-    const detail = body.length > 0 ? `：${body.slice(0, 200)}` : ''
-    return { ok: false, error: `DeepSeek 接口返回 ${response.status}${detail}` }
-  }
-
-  const data = (await response.json()) as {
-    is_available?: boolean
-    balance_infos?: BalanceInfo[]
-  }
-  const balance = data.balance_infos?.[0]
-
-  // Detailed usage is best-effort: a missing token or a platform failure must
-  // never turn a healthy balance read into an error.
-  const usageResult = await queryUsage(ctx, new Date())
-
-  const userToken = await resolveSecret(ctx, USER_TOKEN_ENV)
-  const platformToken = userToken === undefined || userToken.length === 0
-    ? await resolveSecret(ctx, PLATFORM_TOKEN_ENV)
-    : userToken
 
   return {
     ok: true,
-    is_available: data.is_available ?? false,
-    ...(balance === undefined ? {} : { balance }),
+    is_available: balanceResult.is_available,
+    ...(balanceResult.balance === undefined ? {} : { balance: balanceResult.balance }),
     ...(usageResult.usage === undefined ? {} : { usage: usageResult.usage }),
     ...(usageResult.models === undefined ? {} : { models: usageResult.models }),
     configured: {
@@ -233,6 +265,20 @@ async function queryBalance(ctx: Context, config: Config): Promise<BalanceRespon
       userToken: maskSecret(platformToken),
     },
     ...(usageResult.note === undefined ? {} : { usage_note: usageResult.note }),
+  }
+}
+
+/** Masked credentials only — the configuration card's lightweight read, no network. */
+async function queryConfiguredOnly(ctx: Context): Promise<BalanceResponse> {
+  const apiKey = await resolveSecret(ctx, API_KEY_ENV)
+  const platformToken = await resolvePlatformToken(ctx)
+  return {
+    ok: true,
+    is_available: false,
+    configured: {
+      apiKey: maskSecret(apiKey),
+      userToken: maskSecret(platformToken),
+    },
   }
 }
 
@@ -344,6 +390,7 @@ async function platformGet(
       Origin: 'https://platform.deepseek.com',
       Referer: 'https://platform.deepseek.com/usage',
     },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
   if (!response.ok) {
     throw new Error(`用量接口返回 HTTP ${response.status}`)
@@ -418,8 +465,16 @@ interface ModelTotals {
   requests: number
 }
 
-/** Sum amount + cost buckets per model across every fetched day (the current month). */
-function foldModels(amountDays: DayUsage[], costDays: DayUsage[]): ModelUsageInfo[] {
+/**
+ * Sum amount + cost buckets per model across the CURRENT month's days only.
+ * When the running week crosses a month boundary `monthsNeeded` fetches two
+ * months; folding every fetched day would leak the previous month's usage into
+ * the "本月" breakdown, so days outside `monthPrefix` (e.g. `2025-01`) are
+ * skipped here. The today/week/month totals are unaffected — `sumRange` already
+ * filters by date.
+ */
+function foldModels(amountDays: DayUsage[], costDays: DayUsage[], monthPrefix: string): ModelUsageInfo[] {
+  const inMonth = (day: DayUsage): boolean => day.date?.startsWith(monthPrefix) === true
   const map = new Map<string, ModelTotals>()
   const entryFor = (name: string): ModelTotals => {
     let entry = map.get(name)
@@ -430,6 +485,7 @@ function foldModels(amountDays: DayUsage[], costDays: DayUsage[]): ModelUsageInf
     return entry
   }
   for (const day of amountDays) {
+    if (!inMonth(day)) continue
     for (const model of day.data ?? []) {
       if (model.model === undefined) continue
       const entry = entryFor(model.model)
@@ -440,6 +496,7 @@ function foldModels(amountDays: DayUsage[], costDays: DayUsage[]): ModelUsageInf
     }
   }
   for (const day of costDays) {
+    if (!inMonth(day)) continue
     for (const model of day.data ?? []) {
       if (model.model === undefined) continue
       const entry = entryFor(model.model)
@@ -464,18 +521,15 @@ function foldModels(amountDays: DayUsage[], costDays: DayUsage[]): ModelUsageInf
 async function queryUsage(
   ctx: Context,
   now: Date,
+  platformToken?: string,
 ): Promise<{ usage?: UsageInfo; models?: ModelUsageInfo[]; note?: string }> {
-  const userToken = await resolveSecret(ctx, USER_TOKEN_ENV)
-  const platformToken = userToken === undefined || userToken.length === 0
-    ? await resolveSecret(ctx, PLATFORM_TOKEN_ENV)
-    : userToken
-  if (platformToken === undefined || platformToken.length === 0) {
+  const token = platformToken ?? await resolvePlatformToken(ctx)
+  if (token === undefined || token.length === 0) {
     return {
       note: '未配置 DEEPSEEK_USER_TOKEN，无法显示消费与 Tokens 用量（余额不受影响）。'
         + '该 token 是 platform.deepseek.com 登录后 localStorage 中的 userToken。',
     }
   }
-  const token = platformToken
 
   const months = monthsNeeded(now)
   const amountResponses: Array<PlatformResponse<AmountBizData>> = []
@@ -520,7 +574,7 @@ async function queryUsage(
       week_tokens: week.tokens,
       month_tokens: month.tokens,
     },
-    models: foldModels(amountDays, costDays),
+    models: foldModels(amountDays, costDays, dateString(now).slice(0, 7)),
   }
 }
 
@@ -550,9 +604,22 @@ export function apply(ctx: Context, config: Config = {}): void {
           res.end(JSON.stringify({ ok: false, error: 'method not allowed' }))
           return
         }
+        // HEAD carries no body — answer without any outbound work.
+        if (req.method === 'HEAD') {
+          res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' })
+          res.end()
+          return
+        }
+        // `?usage=0` serves the configuration card's lightweight read (masked
+        // credentials only); the card must not trigger the usage aggregation.
+        const query = new URL(req.url ?? '/', 'http://localhost').searchParams
+        const usageFlag = query.get('usage')
+        const lightweight = usageFlag === '0' || usageFlag === 'false'
         void (async () => {
           try {
-            const result = await queryBalance(ctx, current())
+            const result = lightweight
+              ? await queryConfiguredOnly(ctx)
+              : await queryBalance(ctx, current())
             res.writeHead(200, {
               'content-type': 'application/json; charset=utf-8',
               'cache-control': 'no-store',

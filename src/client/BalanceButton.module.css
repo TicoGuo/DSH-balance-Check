@@ -23,9 +23,19 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+/* A failed read (typically: no API key configured yet) is tinted so it reads
+   as a warning state instead of "still loading". */
+.triggerError {
+  color: var(--dsw-alias-state-error-primary);
+}
+
 .label {
   font-weight: 500;
   font-variant-numeric: tabular-nums;
+}
+
+.labelError {
+  font-weight: 700;
 }
 
 .popover {
@@ -212,6 +222,13 @@
 .error {
   color: var(--dsw-alias-state-error-primary);
   opacity: 1;
+}
+
+.errorHint {
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.5;
+  opacity: 0.7;
 }
 
 .note {

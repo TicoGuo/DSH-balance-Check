@@ -46,6 +46,22 @@ async function queryBalance(): Promise<BalanceResponse> {
 }
 
 /**
+ * Query ONLY the masked configured credentials via the host's lightweight mode
+ * (`?usage=0`): no balance fetch, no platform usage aggregation — opening the
+ * settings card must not trigger up to four platform requests.
+ */
+async function queryConfigured(): Promise<BalanceResponse> {
+  const response = await fetch('/balance?usage=0', {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+  })
+  if (!response.ok) {
+    return { ok: false, error: `查询失败（HTTP ${response.status}）` }
+  }
+  return (await response.json()) as BalanceResponse
+}
+
+/**
  * Client plugin body: mount the balance button and the plugin-configuration card.
  * @param ctx - client root context.
  */
@@ -56,7 +72,7 @@ export function apply(ctx: ClientContext): void {
   const card = new BalanceCardController(
     ctx.settingsScope.bind({ namespace: BALANCE_NS }),
     api,
-    queryBalance,
+    queryConfigured,
   )
 
   ctx.slots.inject('conversation.input.right', () => ctx.slots.register({

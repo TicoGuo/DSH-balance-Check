@@ -92,12 +92,12 @@ export class BalanceCardController {
   /**
    * @param scope - the bound settings scope for the `balance-check` namespace.
    * @param api - wire face used for the credentials this card writes.
-   * @param queryBalance - fetches the host /balance route (masked credentials).
+   * @param queryConfigured - fetches the host /balance?usage=0 route (masked credentials only).
    */
   constructor(
     private readonly scope: SettingsScope<BalanceSettings>,
     private readonly api: Pick<IApiClient, 'credentials'>,
-    private readonly queryBalance: () => Promise<BalanceResponse>,
+    private readonly queryConfigured: () => Promise<BalanceResponse>,
   ) {
     this.store = createSnapshotStore(this.projection())
     scope.subscribe(() => {
@@ -109,7 +109,7 @@ export class BalanceCardController {
   /** Read the masked configured values and each credential's writability. */
   private async readConfigured(): Promise<void> {
     try {
-      const balance = await this.queryBalance()
+      const balance = await this.queryConfigured()
       if (balance.ok) {
         this.apiKeyMasked = balance.configured.apiKey
         this.userTokenMasked = balance.configured.userToken
